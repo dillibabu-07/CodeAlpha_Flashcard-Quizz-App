@@ -39,52 +39,56 @@ class FlashcardDao {
   }
 
   /// Get all flashcards with category name (joined)
-  Future<List<FlashcardModel>> getAll({SortOrder sort = SortOrder.newest}) async {
+  Future<List<FlashcardModel>> getAll({String? userId, SortOrder sort = SortOrder.newest}) async {
     final db = await _db;
     final orderBy = _sortOrderClause(sort);
     final results = await db.rawQuery('''
-      SELECT f.*, c.name AS category_name
+      SELECT f.*, c.name AS category_name,
+             (SELECT COUNT(*) FROM user_favorites uf WHERE uf.flashcard_id = f.id AND uf.user_id = ?) AS is_favorite
       FROM flashcards f
       LEFT JOIN categories c ON f.category_id = c.id
       ORDER BY $orderBy
-    ''');
+    ''', [userId ?? '']);
     return results.map((m) => FlashcardModel.fromMap(m)).toList();
   }
 
   /// Get flashcards by category
   Future<List<FlashcardModel>> getByCategory(String categoryId,
-      {SortOrder sort = SortOrder.newest}) async {
+      {String? userId, SortOrder sort = SortOrder.newest}) async {
     final db = await _db;
     final orderBy = _sortOrderClause(sort);
     final results = await db.rawQuery('''
-      SELECT f.*, c.name AS category_name
+      SELECT f.*, c.name AS category_name,
+             (SELECT COUNT(*) FROM user_favorites uf WHERE uf.flashcard_id = f.id AND uf.user_id = ?) AS is_favorite
       FROM flashcards f
       LEFT JOIN categories c ON f.category_id = c.id
       WHERE f.category_id = ?
       ORDER BY $orderBy
-    ''', [categoryId]);
+    ''', [userId ?? '', categoryId]);
     return results.map((m) => FlashcardModel.fromMap(m)).toList();
   }
 
-  /// Get favorites
-  Future<List<FlashcardModel>> getFavorites() async {
+  /// Get favorites for a specific user
+  Future<List<FlashcardModel>> getFavorites(String userId) async {
     final db = await _db;
     final results = await db.rawQuery('''
-      SELECT f.*, c.name AS category_name
+      SELECT f.*, c.name AS category_name, 1 AS is_favorite
       FROM flashcards f
+      INNER JOIN user_favorites uf ON uf.flashcard_id = f.id
       LEFT JOIN categories c ON f.category_id = c.id
-      WHERE f.is_favorite = 1
+      WHERE uf.user_id = ?
       ORDER BY f.updated_at DESC
-    ''');
+    ''', [userId]);
     return results.map((m) => FlashcardModel.fromMap(m)).toList();
   }
 
   /// Search flashcards (question, answer, tags, category name)
-  Future<List<FlashcardModel>> search(String query) async {
+  Future<List<FlashcardModel>> search(String query, {String? userId}) async {
     final db = await _db;
     final q = '%${query.toLowerCase()}%';
     final results = await db.rawQuery('''
-      SELECT f.*, c.name AS category_name
+      SELECT f.*, c.name AS category_name,
+             (SELECT COUNT(*) FROM user_favorites uf WHERE uf.flashcard_id = f.id AND uf.user_id = ?) AS is_favorite
       FROM flashcards f
       LEFT JOIN categories c ON f.category_id = c.id
       WHERE LOWER(f.question) LIKE ?
@@ -92,48 +96,57 @@ class FlashcardDao {
          OR LOWER(f.tags) LIKE ?
          OR LOWER(c.name) LIKE ?
       ORDER BY f.updated_at DESC
-    ''', [q, q, q, q]);
+    ''', [userId ?? '', q, q, q, q]);
     return results.map((m) => FlashcardModel.fromMap(m)).toList();
   }
 
   /// Filter by difficulty
-  Future<List<FlashcardModel>> getByDifficulty(String difficulty) async {
+  Future<List<FlashcardModel>> getByDifficulty(String difficulty, {String? userId}) async {
     final db = await _db;
     final results = await db.rawQuery('''
-      SELECT f.*, c.name AS category_name
+      SELECT f.*, c.name AS category_name,
+             (SELECT COUNT(*) FROM user_favorites uf WHERE uf.flashcard_id = f.id AND uf.user_id = ?) AS is_favorite
       FROM flashcards f
       LEFT JOIN categories c ON f.category_id = c.id
       WHERE f.difficulty = ?
       ORDER BY f.updated_at DESC
-    ''', [difficulty]);
+    ''', [userId ?? '', difficulty]);
     return results.map((m) => FlashcardModel.fromMap(m)).toList();
   }
 
   /// Get recent flashcards (limit N)
-  Future<List<FlashcardModel>> getRecent({int limit = 10}) async {
+  Future<List<FlashcardModel>> getRecent({String? userId, int limit = 10}) async {
     final db = await _db;
     final results = await db.rawQuery('''
-      SELECT f.*, c.name AS category_name
+      SELECT f.*, c.name AS category_name,
+             (SELECT COUNT(*) FROM user_favorites uf WHERE uf.flashcard_id = f.id AND uf.user_id = ?) AS is_favorite
       FROM flashcards f
       LEFT JOIN categories c ON f.category_id = c.id
       ORDER BY f.created_at DESC
       LIMIT ?
-    ''', [limit]);
+    ''', [userId ?? '', limit]);
     return results.map((m) => FlashcardModel.fromMap(m)).toList();
   }
 
-  /// Toggle favorite
-  Future<void> toggleFavorite(String id, bool isFavorite) async {
+  /// Toggle favorite for a user
+  Future<void> toggleFavorite(String id, String userId, bool isFavorite) async {
     final db = await _db;
-    await db.update(
-      'flashcards',
-      {
-        'is_favorite': isFavorite ? 1 : 0,
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    if (isFavorite) {
+      await db.insert(
+        'user_favorites',
+        {
+          'user_id': userId,
+          'flashcard_id': id,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    } else {
+      await db.delete(
+        'user_favorites',
+        where: 'user_id = ? AND flashcard_id = ?',
+        whereArgs: [userId, id],
+      );
+    }
   }
 
   /// Get total count
@@ -144,14 +157,15 @@ class FlashcardDao {
   }
 
   /// Get single flashcard by ID
-  Future<FlashcardModel?> getById(String id) async {
+  Future<FlashcardModel?> getById(String id, {String? userId}) async {
     final db = await _db;
     final results = await db.rawQuery('''
-      SELECT f.*, c.name AS category_name
+      SELECT f.*, c.name AS category_name,
+             (SELECT COUNT(*) FROM user_favorites uf WHERE uf.flashcard_id = f.id AND uf.user_id = ?) AS is_favorite
       FROM flashcards f
       LEFT JOIN categories c ON f.category_id = c.id
       WHERE f.id = ?
-    ''', [id]);
+    ''', [userId ?? '', id]);
     if (results.isEmpty) return null;
     return FlashcardModel.fromMap(results.first);
   }

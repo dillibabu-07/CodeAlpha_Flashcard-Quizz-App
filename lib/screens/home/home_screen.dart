@@ -12,6 +12,7 @@ import '../../widgets/common/stat_card.dart';
 import '../../widgets/flashcard/flashcard_tile.dart';
 import '../../utils/extensions.dart';
 import '../flashcards/add_edit_flashcard_screen.dart';
+import '../../providers/auth_provider.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -28,14 +29,17 @@ class HomeScreen extends StatelessWidget {
     final catProvider = context.watch<CategoryProvider>();
     final cardProvider = context.watch<FlashcardProvider>();
     final statsProvider = context.watch<StatsProvider>();
+    final user = context.watch<AuthProvider>().currentUser;
+    final role = user?.role ?? 'Student';
+    final isAdmin = role == 'Admin';
 
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
           await Future.wait([
             catProvider.loadCategories(),
-            cardProvider.loadFlashcards(),
-            statsProvider.loadStats(),
+            cardProvider.loadFlashcards(userId: user?.id),
+            statsProvider.loadStats(userId: user?.id, role: role),
           ]);
         },
         child: CustomScrollView(
@@ -72,7 +76,7 @@ class HomeScreen extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      'Ready to Study?',
+                                      isAdmin ? 'Admin Dashboard' : 'Ready to Study?',
                                       style: GoogleFonts.poppins(
                                         fontSize: 24,
                                         fontWeight: FontWeight.w800,
@@ -163,21 +167,38 @@ class HomeScreen extends StatelessWidget {
                     color: AppColors.accent,
                     onTap: () => Navigator.pushNamed(context, '/categories'),
                   ),
-                  StatCard(
-                    title: "Today's Study",
-                    value: '${statsProvider.todayStudied}',
-                    icon: Icons.today_rounded,
-                    color: const Color(0xFFF59E0B),
-                    onTap: () => Navigator.pushNamed(context, '/statistics'),
-                  ),
-                  StatCard(
-                    title: 'Streak',
-                    value: '${statsProvider.studyStreak}d',
-                    icon: Icons.local_fire_department_rounded,
-                    color: const Color(0xFFEF4444),
-                    subtitle: 'Keep it up!',
-                    onTap: () => Navigator.pushNamed(context, '/statistics'),
-                  ),
+                  if (isAdmin) ...[
+                    StatCard(
+                      title: 'Total Studied',
+                      value: '${statsProvider.totalStudied}',
+                      icon: Icons.done_all_rounded,
+                      color: const Color(0xFFF59E0B),
+                      onTap: () => Navigator.pushNamed(context, '/statistics'),
+                    ),
+                    StatCard(
+                      title: 'Sessions',
+                      value: '${statsProvider.totalSessions}',
+                      icon: Icons.assignment_turned_in_rounded,
+                      color: const Color(0xFFEF4444),
+                      onTap: () => Navigator.pushNamed(context, '/statistics'),
+                    ),
+                  ] else ...[
+                    StatCard(
+                      title: "Today's Study",
+                      value: '${statsProvider.todayStudied}',
+                      icon: Icons.today_rounded,
+                      color: const Color(0xFFF59E0B),
+                      onTap: () => Navigator.pushNamed(context, '/statistics'),
+                    ),
+                    StatCard(
+                      title: 'Streak',
+                      value: '${statsProvider.studyStreak}d',
+                      icon: Icons.local_fire_department_rounded,
+                      color: const Color(0xFFEF4444),
+                      subtitle: 'Keep it up!',
+                      onTap: () => Navigator.pushNamed(context, '/statistics'),
+                    ),
+                  ]
                 ]),
               ),
             ),
@@ -232,7 +253,7 @@ class HomeScreen extends StatelessWidget {
                               .getById(card.categoryId)
                               ?.color,
                           onFavorite: () =>
-                              cardProvider.toggleFavorite(card.id),
+                              cardProvider.toggleFavorite(card.id, userId: user?.id),
                           onTap: () => Navigator.pushNamed(
                               context, '/study',
                               arguments: card.categoryId),
@@ -299,32 +320,64 @@ class _SectionHeader extends StatelessWidget {
 class _QuickActionsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final actions = [
-      _QuickAction(
-        icon: Icons.menu_book_rounded,
-        label: 'Study',
-        color: AppColors.primary,
-        route: '/study',
-      ),
-      _QuickAction(
-        icon: Icons.quiz_rounded,
-        label: 'Quiz',
-        color: AppColors.accent,
-        route: '/quiz',
-      ),
-      _QuickAction(
-        icon: Icons.category_rounded,
-        label: 'Categories',
-        color: const Color(0xFF7C3AED),
-        route: '/categories',
-      ),
-      _QuickAction(
-        icon: Icons.favorite_rounded,
-        label: 'Favorites',
-        color: const Color(0xFFDB2777),
-        route: '/favorites',
-      ),
-    ];
+    final role = context.watch<AuthProvider>().currentUser?.role ?? 'Student';
+    final List<_QuickAction> actions;
+
+    if (role == 'Admin') {
+      actions = const [
+        _QuickAction(
+          icon: Icons.category_rounded,
+          label: 'Categories',
+          color: Color(0xFF7C3AED),
+          route: '/categories',
+        ),
+        _QuickAction(
+          icon: Icons.style_rounded,
+          label: 'Cards',
+          color: AppColors.primary,
+          route: '/flashcards',
+        ),
+        _QuickAction(
+          icon: Icons.bar_chart_rounded,
+          label: 'Stats',
+          color: AppColors.accent,
+          route: '/statistics',
+        ),
+        _QuickAction(
+          icon: Icons.settings_rounded,
+          label: 'Settings',
+          color: Color(0xFFDB2777),
+          route: '/settings',
+        ),
+      ];
+    } else {
+      actions = const [
+        _QuickAction(
+          icon: Icons.menu_book_rounded,
+          label: 'Study',
+          color: AppColors.primary,
+          route: '/study',
+        ),
+        _QuickAction(
+          icon: Icons.quiz_rounded,
+          label: 'Quiz',
+          color: AppColors.accent,
+          route: '/quiz',
+        ),
+        _QuickAction(
+          icon: Icons.category_rounded,
+          label: 'Categories',
+          color: Color(0xFF7C3AED),
+          route: '/categories',
+        ),
+        _QuickAction(
+          icon: Icons.favorite_rounded,
+          label: 'Favorites',
+          color: Color(0xFFDB2777),
+          route: '/favorites',
+        ),
+      ];
+    }
 
     return GridView.count(
       crossAxisCount: 4,

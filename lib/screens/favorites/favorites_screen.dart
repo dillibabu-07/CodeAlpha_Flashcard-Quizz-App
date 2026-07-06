@@ -9,6 +9,7 @@ import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/custom_snackbar.dart';
 import '../../widgets/flashcard/flashcard_tile.dart';
 import '../../widgets/common/gradient_header.dart';
+import '../../providers/auth_provider.dart';
 import '../flashcards/add_edit_flashcard_screen.dart';
 
 class FavoritesScreen extends StatelessWidget {
@@ -18,6 +19,8 @@ class FavoritesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<FlashcardProvider>();
     final catProvider = context.watch<CategoryProvider>();
+    final user = context.watch<AuthProvider>().currentUser;
+    final isAdmin = user?.role == 'Admin';
     final favorites = provider.favorites;
 
     return Scaffold(
@@ -86,19 +89,23 @@ class FavoritesScreen extends StatelessWidget {
                       return FlashcardTile(
                         card: card,
                         accentColor: const Color(0xFFDB2777),
-                        onFavorite: () => provider.toggleFavorite(card.id),
-                        onEdit: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  AddEditFlashcardScreen(card: card)),
-                        ),
-                        onDelete: () async {
-                          await provider.deleteFlashcard(card.id);
-                          if (context.mounted) {
-                            CustomSnackbar.success(context, 'Card deleted');
-                          }
-                        },
+                        onFavorite: () => provider.toggleFavorite(card.id, userId: user?.id),
+                        onEdit: isAdmin
+                            ? () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          AddEditFlashcardScreen(card: card)),
+                                )
+                            : null,
+                        onDelete: isAdmin
+                            ? () async {
+                                await provider.deleteFlashcard(card.id);
+                                if (context.mounted) {
+                                  CustomSnackbar.success(context, 'Card deleted');
+                                }
+                              }
+                            : null,
                       );
                     },
                     childCount: favorites.length,

@@ -10,6 +10,7 @@ import '../../providers/theme_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/flashcard_provider.dart';
 import '../../providers/stats_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../database/database_helper.dart';
 import '../../widgets/common/custom_snackbar.dart';
 import '../../services/sample_data_service.dart';
@@ -29,6 +30,44 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(AppSizes.md),
         children: [
+          // Account section
+          _SectionHeader('Account'),
+          _SettingCard(
+            children: [
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.primary.withOpacity(0.12),
+                  child: Text(
+                    context.read<AuthProvider>().currentUser?.name.substring(0, 1).toUpperCase() ?? 'U',
+                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                title: Text(
+                  context.read<AuthProvider>().currentUser?.name ?? 'Guest User',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                subtitle: Text(
+                  'Role: ${context.read<AuthProvider>().currentUser?.role ?? 'Student'}',
+                  style: GoogleFonts.inter(fontSize: 12),
+                ),
+              ),
+              const Divider(height: 1),
+              _SettingTile(
+                icon: Icons.logout_rounded,
+                iconColor: AppColors.error,
+                title: 'Logout',
+                subtitle: 'Sign out of your account',
+                onTap: () async {
+                  await context.read<AuthProvider>().logout();
+                  if (context.mounted) {
+                    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSizes.md),
+
           // Appearance section
           _SectionHeader('Appearance'),
           _SettingCard(

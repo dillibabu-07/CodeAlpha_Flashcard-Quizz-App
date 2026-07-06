@@ -8,6 +8,7 @@ import '../../models/category_model.dart';
 import '../../providers/flashcard_provider.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/custom_snackbar.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/flashcard/flashcard_tile.dart';
 import '../flashcards/add_edit_flashcard_screen.dart';
 
@@ -24,6 +25,8 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<FlashcardProvider>();
+    final user = context.watch<AuthProvider>().currentUser;
+    final isAdmin = user?.role == 'Admin';
     final cards = provider.getByCategory(widget.category.id);
     final cat = widget.category;
 
@@ -119,11 +122,12 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                   child: EmptyState(
                     icon: Icons.style_rounded,
                     title: 'No Flashcards',
-                    description:
-                        'Add flashcards to this category to start studying',
-                    buttonLabel: 'Add Flashcard',
+                    description: isAdmin
+                        ? 'Add flashcards to this category to start studying'
+                        : 'No flashcards available in this category yet.',
+                    buttonLabel: isAdmin ? 'Add Flashcard' : null,
                     iconColor: cat.color,
-                    onButtonPressed: () => _addCard(context, provider),
+                    onButtonPressed: isAdmin ? () => _addCard(context, provider) : null,
                   ),
                 )
               : SliverList(
@@ -133,30 +137,36 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                       return FlashcardTile(
                         card: card,
                         accentColor: cat.color,
-                        onFavorite: () => provider.toggleFavorite(card.id),
-                        onEdit: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                AddEditFlashcardScreen(card: card),
-                          ),
-                        ),
-                        onDelete: () async {
-                          await provider.deleteFlashcard(card.id);
-                          if (context.mounted) {
-                            CustomSnackbar.success(context, 'Card deleted');
-                          }
-                        },
-                        onDuplicate: () async {
-                          final dup = card.copyWith(
-                            id: null,
-                            question: '${card.question} (copy)',
-                          );
-                          await provider.addFlashcard(dup);
-                          if (context.mounted) {
-                            CustomSnackbar.success(context, 'Card duplicated');
-                          }
-                        },
+                        onFavorite: () => provider.toggleFavorite(card.id, userId: user?.id),
+                        onEdit: isAdmin
+                            ? () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        AddEditFlashcardScreen(card: card),
+                                  ),
+                                )
+                            : null,
+                        onDelete: isAdmin
+                            ? () async {
+                                await provider.deleteFlashcard(card.id);
+                                if (context.mounted) {
+                                  CustomSnackbar.success(context, 'Card deleted');
+                                }
+                              }
+                            : null,
+                        onDuplicate: isAdmin
+                            ? () async {
+                                final dup = card.copyWith(
+                                  id: null,
+                                  question: '${card.question} (copy)',
+                                );
+                                await provider.addFlashcard(dup);
+                                if (context.mounted) {
+                                  CustomSnackbar.success(context, 'Card duplicated');
+                                }
+                              }
+                            : null,
                       );
                     },
                     childCount: cards.length,
@@ -167,11 +177,13 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
               padding: EdgeInsets.only(bottom: AppSizes.xxl + AppSizes.lg)),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _addCard(context, provider),
-        child: const Icon(Icons.add_rounded),
-        tooltip: 'Add Flashcard',
-      ),
+      floatingActionButton: isAdmin
+          ? FloatingActionButton(
+              onPressed: () => _addCard(context, provider),
+              child: const Icon(Icons.add_rounded),
+              tooltip: 'Add Flashcard',
+            )
+          : null,
     );
   }
 

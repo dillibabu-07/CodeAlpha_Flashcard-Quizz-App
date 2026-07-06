@@ -15,47 +15,58 @@ class QuizResultDao {
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<List<QuizResultModel>> getAll() async {
+  Future<List<QuizResultModel>> getAll({String? userId}) async {
     final db = await _db;
     final results = await db.rawQuery('''
       SELECT qr.*, c.name AS category_name
       FROM quiz_results qr
       LEFT JOIN categories c ON qr.category_id = c.id
+      ${userId != null ? 'WHERE qr.user_id = ?' : ''}
       ORDER BY qr.created_at DESC
-    ''');
+    ''', userId != null ? [userId] : []);
     return results.map((m) => QuizResultModel.fromMap(m)).toList();
   }
 
-  Future<List<QuizResultModel>> getRecent({int limit = 5}) async {
+  Future<List<QuizResultModel>> getRecent({String? userId, int limit = 5}) async {
     final db = await _db;
     final results = await db.rawQuery('''
       SELECT qr.*, c.name AS category_name
       FROM quiz_results qr
       LEFT JOIN categories c ON qr.category_id = c.id
+      ${userId != null ? 'WHERE qr.user_id = ?' : ''}
       ORDER BY qr.created_at DESC
       LIMIT ?
-    ''', [limit]);
+    ''', userId != null ? [userId, limit] : [limit]);
     return results.map((m) => QuizResultModel.fromMap(m)).toList();
   }
 
-  Future<double> getAverageAccuracy() async {
+  Future<double> getAverageAccuracy({String? userId}) async {
     final db = await _db;
-    final result = await db
-        .rawQuery('SELECT AVG(percentage) AS avg FROM quiz_results');
+    final result = await db.rawQuery(
+      'SELECT AVG(percentage) AS avg FROM quiz_results' +
+      (userId != null ? ' WHERE user_id = ?' : ''),
+      userId != null ? [userId] : [],
+    );
     return (result.first['avg'] as num?)?.toDouble() ?? 0.0;
   }
 
-  Future<double> getBestScore() async {
+  Future<double> getBestScore({String? userId}) async {
     final db = await _db;
-    final result = await db
-        .rawQuery('SELECT MAX(percentage) AS best FROM quiz_results');
+    final result = await db.rawQuery(
+      'SELECT MAX(percentage) AS best FROM quiz_results' +
+      (userId != null ? ' WHERE user_id = ?' : ''),
+      userId != null ? [userId] : [],
+    );
     return (result.first['best'] as num?)?.toDouble() ?? 0.0;
   }
 
-  Future<int> getTotalSessions() async {
+  Future<int> getTotalSessions({String? userId}) async {
     final db = await _db;
-    final result =
-        await db.rawQuery('SELECT COUNT(*) AS cnt FROM quiz_results');
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) AS cnt FROM quiz_results' +
+      (userId != null ? ' WHERE user_id = ?' : ''),
+      userId != null ? [userId] : [],
+    );
     return result.first['cnt'] as int;
   }
 }

@@ -7,6 +7,7 @@ import '../../constants/app_sizes.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/quiz_provider.dart';
 import '../../widgets/common/empty_state.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/quiz/option_button.dart';
 import 'quiz_result_screen.dart';
 
@@ -45,8 +46,10 @@ class _QuizScreenState extends State<QuizScreen> {
         onTimerChanged: (v) => setState(() => _timerEnabled = v),
         onStart: (catId) async {
           setState(() => _setupMode = false);
+          final user = context.read<AuthProvider>().currentUser;
           await provider.loadQuiz(
             categoryId: catId,
+            userId: user?.id,
             questionCount: _questionCount,
             enableTimer: _timerEnabled,
           );
@@ -245,7 +248,10 @@ class _QuizScreenState extends State<QuizScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: provider.nextQuestion,
+                      onPressed: () {
+                        final user = context.read<AuthProvider>().currentUser;
+                        provider.nextQuestion(userId: user?.id);
+                      },
                       child: Text(
                         provider.currentIndex < provider.totalQuestions - 1
                             ? 'Next Question →'

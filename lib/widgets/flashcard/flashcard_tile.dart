@@ -95,7 +95,8 @@ class FlashcardTile extends StatelessWidget {
                 ),
                 const SizedBox(width: AppSizes.xs),
                 // More actions menu
-                _MoreMenu(card: card, onEdit: onEdit, onDelete: onDelete, onDuplicate: onDuplicate),
+                if (onEdit != null || onDelete != null || onDuplicate != null)
+                  _MoreMenu(card: card, onEdit: onEdit, onDelete: onDelete, onDuplicate: onDuplicate),
               ],
             ),
             const SizedBox(height: AppSizes.sm),

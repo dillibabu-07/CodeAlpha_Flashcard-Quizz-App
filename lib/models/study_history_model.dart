@@ -2,6 +2,7 @@
 
 class StudyHistoryModel {
   final String id;
+  final String? userId;
   final String flashcardId;
   final String categoryId;
   final bool wasCorrect;
@@ -9,6 +10,7 @@ class StudyHistoryModel {
 
   StudyHistoryModel({
     required this.id,
+    this.userId,
     required this.flashcardId,
     required this.categoryId,
     required this.wasCorrect,
@@ -17,6 +19,7 @@ class StudyHistoryModel {
 
   Map<String, dynamic> toMap() => {
         'id': id,
+        'user_id': userId,
         'flashcard_id': flashcardId,
         'category_id': categoryId,
         'was_correct': wasCorrect ? 1 : 0,
@@ -26,6 +29,7 @@ class StudyHistoryModel {
   factory StudyHistoryModel.fromMap(Map<String, dynamic> map) {
     return StudyHistoryModel(
       id: map['id'] as String,
+      userId: map['user_id'] as String?,
       flashcardId: map['flashcard_id'] as String,
       categoryId: map['category_id'] as String,
       wasCorrect: (map['was_correct'] as int) == 1,

@@ -32,15 +32,24 @@ class FlashcardProvider extends ChangeNotifier {
   int get totalCount => _all.length;
   int get favoriteCount => _favorites.length;
 
+  String? _lastUserId;
+
   /// Load all flashcards from DB
-  Future<void> loadFlashcards() async {
+  Future<void> loadFlashcards({String? userId}) async {
+    if (userId != null) {
+      _lastUserId = userId;
+    }
     _isLoading = true;
     _error = null;
     notifyListeners();
     try {
-      _all = await FlashcardDao.instance.getAll(sort: _sortOrder);
-      _favorites = await FlashcardDao.instance.getFavorites();
-      _recent = await FlashcardDao.instance.getRecent(limit: 8);
+      _all = await FlashcardDao.instance.getAll(userId: _lastUserId, sort: _sortOrder);
+      if (_lastUserId != null) {
+        _favorites = await FlashcardDao.instance.getFavorites(_lastUserId!);
+      } else {
+        _favorites = [];
+      }
+      _recent = await FlashcardDao.instance.getRecent(userId: _lastUserId, limit: 8);
       _applyFilters();
     } catch (e) {
       _error = e.toString();
@@ -73,12 +82,15 @@ class FlashcardProvider extends ChangeNotifier {
   }
 
   /// Toggle favorite
-  Future<void> toggleFavorite(String id) async {
+  Future<void> toggleFavorite(String id, {String? userId}) async {
+    final activeUserId = userId ?? _lastUserId;
+    if (activeUserId == null) return;
+
     final idx = _all.indexWhere((c) => c.id == id);
     if (idx == -1) return;
     final card = _all[idx];
     final newFav = !card.isFavorite;
-    await FlashcardDao.instance.toggleFavorite(id, newFav);
+    await FlashcardDao.instance.toggleFavorite(id, activeUserId, newFav);
     _all[idx] = card.copyWith(isFavorite: newFav);
     _favorites = _all.where((c) => c.isFavorite).toList();
     _applyFilters();

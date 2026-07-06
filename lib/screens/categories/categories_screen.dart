@@ -10,6 +10,7 @@ import '../../providers/category_provider.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/gradient_header.dart';
 import '../../widgets/common/custom_snackbar.dart';
+import '../../providers/auth_provider.dart';
 import 'category_detail_screen.dart';
 
 class CategoriesScreen extends StatelessWidget {
@@ -18,6 +19,8 @@ class CategoriesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<CategoryProvider>();
+    final user = context.watch<AuthProvider>().currentUser;
+    final isAdmin = user?.role == 'Admin';
 
     return Scaffold(
       body: CustomScrollView(
@@ -67,11 +70,14 @@ class CategoriesScreen extends StatelessWidget {
                   child: EmptyState(
                     icon: Icons.category_rounded,
                     title: 'No Categories Yet',
-                    description: 'Create your first category to start organizing your flashcards',
-                    buttonLabel: 'Add Category',
+                    description: isAdmin
+                        ? 'Create your first category to start organizing your flashcards'
+                        : 'No categories available at the moment.',
+                    buttonLabel: isAdmin ? 'Add Category' : null,
                     iconColor: const Color(0xFF7C3AED),
-                    onButtonPressed: () =>
-                        _showAddCategorySheet(context, provider),
+                    onButtonPressed: isAdmin
+                        ? () => _showAddCategorySheet(context, provider)
+                        : null,
                   ),
                 )
               : SliverPadding(
@@ -118,11 +124,13 @@ class CategoriesScreen extends StatelessWidget {
               padding: EdgeInsets.only(bottom: AppSizes.xxl + AppSizes.lg)),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddCategorySheet(context, provider),
-        child: const Icon(Icons.add_rounded),
-        tooltip: 'Add Category',
-      ),
+      floatingActionButton: isAdmin
+          ? FloatingActionButton(
+              onPressed: () => _showAddCategorySheet(context, provider),
+              child: const Icon(Icons.add_rounded),
+              tooltip: 'Add Category',
+            )
+          : null,
     );
   }
 
@@ -171,9 +179,9 @@ class _CategoryCard extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
   });
-
   @override
   Widget build(BuildContext context) {
+    final isAdmin = context.watch<AuthProvider>().currentUser?.isAdmin ?? false;
     final gradientIdx = AppColors.categoryGradients.length;
     final colors = AppColors.categoryGradients[
         category.name.hashCode.abs() % AppColors.categoryGradients.length];
@@ -229,36 +237,37 @@ class _CategoryCard extends StatelessWidget {
                         child: Icon(category.icon,
                             color: Colors.white, size: 22),
                       ),
-                      PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert_rounded,
-                            color: Colors.white, size: 18),
-                        shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppSizes.radiusMD),
+                      if (isAdmin)
+                        PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert_rounded,
+                              color: Colors.white, size: 18),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppSizes.radiusMD),
+                          ),
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
+                                value: 'edit',
+                                child: Row(children: [
+                                  Icon(Icons.edit_outlined, size: 16),
+                                  SizedBox(width: 8),
+                                  Text('Edit'),
+                                ])),
+                            const PopupMenuItem(
+                                value: 'delete',
+                                child: Row(children: [
+                                  Icon(Icons.delete_outline_rounded,
+                                      size: 16, color: AppColors.error),
+                                  SizedBox(width: 8),
+                                  Text('Delete',
+                                      style: TextStyle(color: AppColors.error)),
+                                ])),
+                          ],
+                          onSelected: (v) {
+                            if (v == 'edit') onEdit();
+                            if (v == 'delete') onDelete();
+                          },
                         ),
-                        itemBuilder: (_) => [
-                          const PopupMenuItem(
-                              value: 'edit',
-                              child: Row(children: [
-                                Icon(Icons.edit_outlined, size: 16),
-                                SizedBox(width: 8),
-                                Text('Edit'),
-                              ])),
-                          const PopupMenuItem(
-                              value: 'delete',
-                              child: Row(children: [
-                                Icon(Icons.delete_outline_rounded,
-                                    size: 16, color: AppColors.error),
-                                SizedBox(width: 8),
-                                Text('Delete',
-                                    style: TextStyle(color: AppColors.error)),
-                              ])),
-                        ],
-                        onSelected: (v) {
-                          if (v == 'edit') onEdit();
-                          if (v == 'delete') onDelete();
-                        },
-                      ),
                     ],
                   ),
                   const Spacer(),

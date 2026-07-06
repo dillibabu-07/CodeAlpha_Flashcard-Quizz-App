@@ -8,6 +8,7 @@ import 'providers/quiz_provider.dart';
 import 'providers/stats_provider.dart';
 import 'providers/study_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/auth_provider.dart';
 import 'screens/categories/categories_screen.dart';
 import 'screens/favorites/favorites_screen.dart';
 import 'screens/flashcards/flashcards_screen.dart';
@@ -18,6 +19,8 @@ import 'screens/settings/settings_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'screens/statistics/statistics_screen.dart';
 import 'screens/study/study_screen.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
 import 'theme/app_theme.dart';
 import 'constants/app_colors.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -35,6 +38,7 @@ class FlashMasterApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StudyProvider()),
         ChangeNotifierProvider(create: (_) => QuizProvider()),
         ChangeNotifierProvider(create: (_) => StatsProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
@@ -56,6 +60,12 @@ class FlashMasterApp extends StatelessWidget {
     switch (settings.name) {
       case '/splash':
         return _fade(const SplashScreen());
+
+      case '/login':
+        return _fade(const LoginScreen());
+
+      case '/register':
+        return _fade(const RegisterScreen());
 
       case '/home':
         return _fade(const _MainScaffold());
@@ -114,22 +124,43 @@ class _MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<_MainScaffold> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    StudyScreen(),
-    QuizScreen(),
-    StatisticsScreen(),
-    SettingsScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final user = authProvider.currentUser;
+    final role = user?.role ?? 'Student';
+
+    final List<Widget> screens;
+    if (role == 'Admin') {
+      screens = const [
+        HomeScreen(),
+        CategoriesScreen(),
+        FlashcardsScreen(),
+        StatisticsScreen(),
+        SettingsScreen(),
+      ];
+    } else {
+      screens = const [
+        HomeScreen(),
+        StudyScreen(),
+        QuizScreen(),
+        StatisticsScreen(),
+        SettingsScreen(),
+      ];
+    }
+
+    if (_currentIndex >= screens.length) {
+      _currentIndex = 0;
+    }
+
     return Scaffold(
       body: IndexedStack(
+        key: ValueKey('${user?.id}_${role}'),
         index: _currentIndex,
-        children: _screens,
+        children: screens,
       ),
       bottomNavigationBar: _BottomNav(
+        role: role,
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
       ),
@@ -138,36 +169,67 @@ class _MainScaffoldState extends State<_MainScaffold> {
 }
 
 class _BottomNav extends StatelessWidget {
+  final String role;
   final int currentIndex;
   final void Function(int) onTap;
 
-  const _BottomNav({required this.currentIndex, required this.onTap});
+  const _BottomNav({
+    required this.role,
+    required this.currentIndex,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final items = [
-      _NavItem(
-          icon: Icons.home_outlined,
-          activeIcon: Icons.home_rounded,
-          label: 'Home'),
-      _NavItem(
-          icon: Icons.menu_book_outlined,
-          activeIcon: Icons.menu_book_rounded,
-          label: 'Study'),
-      _NavItem(
-          icon: Icons.quiz_outlined,
-          activeIcon: Icons.quiz_rounded,
-          label: 'Quiz'),
-      _NavItem(
-          icon: Icons.bar_chart_outlined,
-          activeIcon: Icons.bar_chart_rounded,
-          label: 'Stats'),
-      _NavItem(
-          icon: Icons.settings_outlined,
-          activeIcon: Icons.settings_rounded,
-          label: 'Settings'),
-    ];
+    final List<_NavItem> items;
+    if (role == 'Admin') {
+      items = const [
+        _NavItem(
+            icon: Icons.home_outlined,
+            activeIcon: Icons.home_rounded,
+            label: 'Home'),
+        _NavItem(
+            icon: Icons.category_outlined,
+            activeIcon: Icons.category_rounded,
+            label: 'Categories'),
+        _NavItem(
+            icon: Icons.style_outlined,
+            activeIcon: Icons.style_rounded,
+            label: 'Cards'),
+        _NavItem(
+            icon: Icons.bar_chart_outlined,
+            activeIcon: Icons.bar_chart_rounded,
+            label: 'Stats'),
+        _NavItem(
+            icon: Icons.settings_outlined,
+            activeIcon: Icons.settings_rounded,
+            label: 'Settings'),
+      ];
+    } else {
+      items = const [
+        _NavItem(
+            icon: Icons.home_outlined,
+            activeIcon: Icons.home_rounded,
+            label: 'Home'),
+        _NavItem(
+            icon: Icons.menu_book_outlined,
+            activeIcon: Icons.menu_book_rounded,
+            label: 'Study'),
+        _NavItem(
+            icon: Icons.quiz_outlined,
+            activeIcon: Icons.quiz_rounded,
+            label: 'Quiz'),
+        _NavItem(
+            icon: Icons.bar_chart_outlined,
+            activeIcon: Icons.bar_chart_rounded,
+            label: 'Stats'),
+        _NavItem(
+            icon: Icons.settings_outlined,
+            activeIcon: Icons.settings_rounded,
+            label: 'Settings'),
+      ];
+    }
 
     return Container(
       decoration: BoxDecoration(

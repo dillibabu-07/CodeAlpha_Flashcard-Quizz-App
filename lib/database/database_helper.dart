@@ -18,13 +18,24 @@ class DatabaseHelper {
     final path = join(dbPath, 'flashmaster.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _onCreate(Database db, int version) async {
+    // Users table
+    await db.execute('''
+      CREATE TABLE users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL
+      )
+    ''');
+
     // Categories table
     await db.execute('''
       CREATE TABLE categories (
@@ -52,10 +63,21 @@ class DatabaseHelper {
       )
     ''');
 
+    // User favorites table
+    await db.execute('''
+      CREATE TABLE user_favorites (
+        user_id TEXT NOT NULL,
+        flashcard_id TEXT NOT NULL,
+        PRIMARY KEY (user_id, flashcard_id),
+        FOREIGN KEY (flashcard_id) REFERENCES flashcards(id) ON DELETE CASCADE
+      )
+    ''');
+
     // Quiz results table
     await db.execute('''
       CREATE TABLE quiz_results (
         id TEXT PRIMARY KEY,
+        user_id TEXT,
         category_id TEXT NOT NULL,
         score INTEGER NOT NULL,
         total INTEGER NOT NULL,
@@ -70,6 +92,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE study_history (
         id TEXT PRIMARY KEY,
+        user_id TEXT,
         flashcard_id TEXT NOT NULL,
         category_id TEXT NOT NULL,
         was_correct INTEGER NOT NULL DEFAULT 0,
@@ -84,6 +107,8 @@ class DatabaseHelper {
     await db.execute('CREATE INDEX idx_flashcards_favorite ON flashcards(is_favorite)');
     await db.execute('CREATE INDEX idx_study_history_date ON study_history(studied_at)');
     await db.execute('CREATE INDEX idx_quiz_results_date ON quiz_results(created_at)');
+    await db.execute('CREATE INDEX idx_quiz_results_user ON quiz_results(user_id)');
+    await db.execute('CREATE INDEX idx_study_history_user ON study_history(user_id)');
 
     // Settings table for first-run flag
     await db.execute('''
@@ -95,7 +120,36 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Future migration logic here
+    if (oldVersion < 2) {
+      // Create users table
+      await db.execute('''
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE,
+          password TEXT NOT NULL,
+          role TEXT NOT NULL
+        )
+      ''');
+
+      // Create user_favorites table
+      await db.execute('''
+        CREATE TABLE user_favorites (
+          user_id TEXT NOT NULL,
+          flashcard_id TEXT NOT NULL,
+          PRIMARY KEY (user_id, flashcard_id),
+          FOREIGN KEY (flashcard_id) REFERENCES flashcards(id) ON DELETE CASCADE
+        )
+      ''');
+
+      // Add user_id column to quiz_results and study_history
+      await db.execute('ALTER TABLE quiz_results ADD COLUMN user_id TEXT');
+      await db.execute('ALTER TABLE study_history ADD COLUMN user_id TEXT');
+
+      // Add indexes
+      await db.execute('CREATE INDEX idx_quiz_results_user ON quiz_results(user_id)');
+      await db.execute('CREATE INDEX idx_study_history_user ON study_history(user_id)');
+    }
   }
 
   /// Check if sample data was already seeded

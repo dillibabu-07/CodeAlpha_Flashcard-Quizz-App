@@ -49,13 +49,19 @@ class QuizProvider extends ChangeNotifier {
   int get durationSeconds =>
       _startTime == null ? 0 : DateTime.now().difference(_startTime!).inSeconds;
 
+  String? _lastUserId;
+
   /// Load and generate quiz
   Future<void> loadQuiz({
     String? categoryId,
+    String? userId,
     int questionCount = 10,
     bool enableTimer = false,
     int timerSecs = 30,
   }) async {
+    if (userId != null) {
+      _lastUserId = userId;
+    }
     _cancelTimer();
     _state = QuizState.loading;
     _categoryId = categoryId;
@@ -69,9 +75,9 @@ class QuizProvider extends ChangeNotifier {
     try {
       List<FlashcardModel> cards;
       if (categoryId != null) {
-        cards = await FlashcardDao.instance.getByCategory(categoryId);
+        cards = await FlashcardDao.instance.getByCategory(categoryId, userId: _lastUserId);
       } else {
-        cards = await FlashcardDao.instance.getAll();
+        cards = await FlashcardDao.instance.getAll(userId: _lastUserId);
       }
 
       if (cards.length < 2) {
@@ -120,22 +126,24 @@ class QuizProvider extends ChangeNotifier {
   }
 
   /// Move to next question
-  Future<void> nextQuestion() async {
+  Future<void> nextQuestion({String? userId}) async {
     if (_currentIndex < _questions.length - 1) {
       _currentIndex++;
       _state = QuizState.active;
       if (_timerEnabled) _startTimer();
     } else {
-      await _finishQuiz();
+      await _finishQuiz(userId: userId);
     }
     notifyListeners();
   }
 
   /// Save result and mark complete
-  Future<void> _finishQuiz() async {
+  Future<void> _finishQuiz({String? userId}) async {
     _state = QuizState.complete;
+    final activeUserId = userId ?? _lastUserId;
     final result = QuizResultModel(
       id: const Uuid().v4(),
+      userId: activeUserId,
       categoryId: _categoryId ?? 'all',
       score: _correctCount,
       total: _questions.length,

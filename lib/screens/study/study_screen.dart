@@ -7,6 +7,7 @@ import '../../constants/app_sizes.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/flashcard_provider.dart';
 import '../../providers/study_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/flashcard/flip_card.dart';
 import '../flashcards/add_edit_flashcard_screen.dart';
@@ -25,7 +26,11 @@ class _StudyScreenState extends State<StudyScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<StudyProvider>().loadCards(categoryId: widget.categoryId);
+      final user = context.read<AuthProvider>().currentUser;
+      context.read<StudyProvider>().loadCards(
+            categoryId: widget.categoryId,
+            userId: user?.id,
+          );
     });
   }
 
@@ -34,6 +39,7 @@ class _StudyScreenState extends State<StudyScreen> {
     final provider = context.watch<StudyProvider>();
     final catProvider = context.watch<CategoryProvider>();
     final cardProvider = context.watch<FlashcardProvider>();
+    final user = context.watch<AuthProvider>().currentUser;
 
     if (provider.isLoading) {
       return const Scaffold(
@@ -135,7 +141,7 @@ class _StudyScreenState extends State<StudyScreen> {
               child: GestureDetector(
                 onHorizontalDragEnd: (details) {
                   if (details.primaryVelocity! < -300) {
-                    provider.nextCard();
+                    provider.nextCard(userId: user?.id);
                   } else if (details.primaryVelocity! > 300) {
                     provider.previousCard();
                   }
@@ -170,10 +176,10 @@ class _StudyScreenState extends State<StudyScreen> {
                   child: ElevatedButton.icon(
                     onPressed: provider.flipCard,
                     icon: Icon(provider.isFlipped
-                        ? Icons.visibility_off_rounded
-                        : Icons.visibility_rounded),
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded),
                     label: Text(
-                        provider.isFlipped ? 'Hide Answer' : 'Show Answer'),
+                      provider.isFlipped ? 'Hide Answer' : 'Show Answer'),
                   ),
                 ),
                 const SizedBox(height: AppSizes.sm),
@@ -192,7 +198,7 @@ class _StudyScreenState extends State<StudyScreen> {
                     const SizedBox(width: AppSizes.sm),
                     // Favorite
                     IconButton(
-                      onPressed: provider.toggleFavorite,
+                      onPressed: () => provider.toggleFavorite(userId: user?.id),
                       icon: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 300),
                         child: Icon(
@@ -213,7 +219,7 @@ class _StudyScreenState extends State<StudyScreen> {
                     const SizedBox(width: AppSizes.sm),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: provider.nextCard,
+                        onPressed: () => provider.nextCard(userId: user?.id),
                         icon: const Icon(Icons.arrow_forward_ios_rounded,
                             size: 16),
                         label: Text(provider.hasNext ? 'Next' : 'Finish'),

@@ -9,6 +9,7 @@ import '../../providers/category_provider.dart';
 import '../../providers/flashcard_provider.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/custom_snackbar.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/flashcard/flashcard_tile.dart';
 import 'add_edit_flashcard_screen.dart';
 
@@ -32,6 +33,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<FlashcardProvider>();
     final catProvider = context.watch<CategoryProvider>();
+    final user = context.watch<AuthProvider>().currentUser;
+    final isAdmin = user?.role == 'Admin';
     final cards = provider.filtered;
 
     return Scaffold(
@@ -121,13 +124,17 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                   : 'No Flashcards Yet',
               description: provider.searchQuery.isNotEmpty
                   ? 'Try different keywords or clear filters'
-                  : 'Add your first flashcard to start studying',
-              buttonLabel: provider.searchQuery.isEmpty ? 'Add Flashcard' : null,
-              onButtonPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const AddEditFlashcardScreen()),
-              ),
+                  : (isAdmin
+                      ? 'Add your first flashcard to start studying'
+                      : 'No flashcards available at the moment.'),
+              buttonLabel: (provider.searchQuery.isEmpty && isAdmin) ? 'Add Flashcard' : null,
+              onButtonPressed: (provider.searchQuery.isEmpty && isAdmin)
+                  ? () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const AddEditFlashcardScreen()),
+                      )
+                  : null,
             )
           : ListView.builder(
               padding: const EdgeInsets.only(
@@ -135,6 +142,15 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
               itemCount: cards.length,
               itemBuilder: (_, i) {
                 final card = cards[i];
+
+                if (!isAdmin) {
+                  return FlashcardTile(
+                    card: card,
+                    accentColor: catProvider.getById(card.categoryId)?.color,
+                    onFavorite: () => provider.toggleFavorite(card.id),
+                  );
+                }
+
                 return Dismissible(
                   key: Key(card.id),
                   direction: DismissDirection.endToStart,
@@ -215,14 +231,16 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => const AddEditFlashcardScreen()),
-        ),
-        child: const Icon(Icons.add_rounded),
-      ),
+      floatingActionButton: isAdmin
+          ? FloatingActionButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const AddEditFlashcardScreen()),
+              ),
+              child: const Icon(Icons.add_rounded),
+            )
+          : null,
     );
   }
 

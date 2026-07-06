@@ -6,6 +6,7 @@ import '../../constants/app_colors.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/flashcard_provider.dart';
 import '../../providers/stats_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/sample_data_service.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -66,13 +67,24 @@ class _SplashScreenState extends State<SplashScreen>
     await SampleDataService.instance.seedIfFirstRun();
 
     if (!mounted) return;
-    await context.read<CategoryProvider>().loadCategories();
-    await context.read<FlashcardProvider>().loadFlashcards();
-    await context.read<StatsProvider>().loadStats();
+    final authProvider = context.read<AuthProvider>();
+    await authProvider.checkAuthStatus();
 
-    await Future.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed('/home');
+    if (authProvider.isAuthenticated) {
+      final user = authProvider.currentUser!;
+      await context.read<CategoryProvider>().loadCategories();
+      await context.read<FlashcardProvider>().loadFlashcards(userId: user.id);
+      await context.read<StatsProvider>().loadStats(userId: user.id, role: user.role);
+
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed('/home');
+    } else {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed('/login');
+    }
   }
 
   @override

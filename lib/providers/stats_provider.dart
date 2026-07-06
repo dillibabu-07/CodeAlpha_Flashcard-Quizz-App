@@ -41,8 +41,14 @@ class StatsProvider extends ChangeNotifier {
   List<DailyStudyStat> get monthlyStats => _monthlyStats;
   List<QuizResultModel> get recentResults => _recentResults;
 
+  String? _lastUserId;
+  String? _lastRole;
+
   /// Load all statistics
-  Future<void> loadStats() async {
+  Future<void> loadStats({String? userId, String? role}) async {
+    if (userId != null) _lastUserId = userId;
+    if (role != null) _lastRole = role;
+
     _isLoading = true;
     notifyListeners();
 
@@ -62,24 +68,31 @@ class StatsProvider extends ChangeNotifier {
   Future<void> _loadCounts() async {
     _totalCards = await FlashcardDao.instance.count();
     _totalCategories = await CategoryDao.instance.count();
-    _favoriteCount = (await FlashcardDao.instance.getFavorites()).length;
+    if (_lastUserId != null && _lastRole == 'Student') {
+      _favoriteCount = (await FlashcardDao.instance.getFavorites(_lastUserId!)).length;
+    } else {
+      _favoriteCount = 0;
+    }
   }
 
   Future<void> _loadStudyStats() async {
-    _totalStudied = await StudyHistoryDao.instance.getTotalCount();
-    _todayStudied = await StudyHistoryDao.instance.getTodayCount();
-    _studyStreak = await StudyHistoryDao.instance.getStudyStreak();
+    final activeUserId = _lastRole == 'Student' ? _lastUserId : null;
+    _totalStudied = await StudyHistoryDao.instance.getTotalCount(userId: activeUserId);
+    _todayStudied = await StudyHistoryDao.instance.getTodayCount(userId: activeUserId);
+    _studyStreak = await StudyHistoryDao.instance.getStudyStreak(userId: activeUserId);
   }
 
   Future<void> _loadQuizStats() async {
-    _averageAccuracy = await QuizResultDao.instance.getAverageAccuracy();
-    _bestScore = await QuizResultDao.instance.getBestScore();
-    _totalSessions = await QuizResultDao.instance.getTotalSessions();
-    _recentResults = await QuizResultDao.instance.getRecent(limit: 5);
+    final activeUserId = _lastRole == 'Student' ? _lastUserId : null;
+    _averageAccuracy = await QuizResultDao.instance.getAverageAccuracy(userId: activeUserId);
+    _bestScore = await QuizResultDao.instance.getBestScore(userId: activeUserId);
+    _totalSessions = await QuizResultDao.instance.getTotalSessions(userId: activeUserId);
+    _recentResults = await QuizResultDao.instance.getRecent(userId: activeUserId, limit: 5);
   }
 
   Future<void> _loadChartData() async {
-    _weeklyStats = await StudyHistoryDao.instance.getDailyStats(days: 7);
-    _monthlyStats = await StudyHistoryDao.instance.getDailyStats(days: 30);
+    final activeUserId = _lastRole == 'Student' ? _lastUserId : null;
+    _weeklyStats = await StudyHistoryDao.instance.getDailyStats(userId: activeUserId, days: 7);
+    _monthlyStats = await StudyHistoryDao.instance.getDailyStats(userId: activeUserId, days: 30);
   }
 }

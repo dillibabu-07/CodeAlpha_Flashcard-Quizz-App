@@ -33,8 +33,13 @@ class StudyProvider extends ChangeNotifier {
     return _cards[_currentIndex];
   }
 
+  String? _lastUserId;
+
   /// Load cards for a category (or all if null)
-  Future<void> loadCards({String? categoryId}) async {
+  Future<void> loadCards({String? categoryId, String? userId}) async {
+    if (userId != null) {
+      _lastUserId = userId;
+    }
     _isLoading = true;
     _currentIndex = 0;
     _isFlipped = false;
@@ -45,9 +50,9 @@ class StudyProvider extends ChangeNotifier {
 
     try {
       if (categoryId != null) {
-        _cards = await FlashcardDao.instance.getByCategory(categoryId);
+        _cards = await FlashcardDao.instance.getByCategory(categoryId, userId: _lastUserId);
       } else {
-        _cards = await FlashcardDao.instance.getAll();
+        _cards = await FlashcardDao.instance.getAll(userId: _lastUserId);
       }
       _originalCards = List.from(_cards);
     } finally {
@@ -63,13 +68,13 @@ class StudyProvider extends ChangeNotifier {
   }
 
   /// Move to next card
-  Future<void> nextCard() async {
+  Future<void> nextCard({String? userId}) async {
     if (!hasNext) {
       _isComplete = true;
       notifyListeners();
       return;
     }
-    await _recordStudy();
+    await _recordStudy(userId: userId);
     _currentIndex++;
     _isFlipped = false;
     notifyListeners();
@@ -108,11 +113,13 @@ class StudyProvider extends ChangeNotifier {
   }
 
   /// Toggle favorite for current card
-  Future<void> toggleFavorite() async {
+  Future<void> toggleFavorite({String? userId}) async {
+    final activeUserId = userId ?? _lastUserId;
+    if (activeUserId == null) return;
     final card = currentCard;
     if (card == null) return;
     final newFav = !card.isFavorite;
-    await FlashcardDao.instance.toggleFavorite(card.id, newFav);
+    await FlashcardDao.instance.toggleFavorite(card.id, activeUserId, newFav);
     _cards[_currentIndex] = card.copyWith(isFavorite: newFav);
     final origIdx = _originalCards.indexWhere((c) => c.id == card.id);
     if (origIdx != -1) {
@@ -122,11 +129,13 @@ class StudyProvider extends ChangeNotifier {
   }
 
   /// Record this card study in history
-  Future<void> _recordStudy() async {
+  Future<void> _recordStudy({String? userId}) async {
     final card = currentCard;
     if (card == null) return;
+    final activeUserId = userId ?? _lastUserId;
     final entry = StudyHistoryModel(
       id: const Uuid().v4(),
+      userId: activeUserId,
       flashcardId: card.id,
       categoryId: card.categoryId,
       wasCorrect: _isFlipped, // considered "correct" if they revealed the answer
